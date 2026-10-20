@@ -11,6 +11,12 @@ from dotenv import load_dotenv
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
 
+def calcular_costo(datos, precio_entrada, precio_salida):
+	uso = datos["usageMetadata"]
+	tokens_entrada = uso["promptTokenCount"]
+	tokens_salida = uso["candidatesTokenCount"]
+	return (tokens_entrada * precio_entrada) + (tokens_salida * precio_salida)
+
 def armar_peticion(pregunta):
     #Valida entrada, construye la URL y el body de la petición.
     if not pregunta or not pregunta.strip():
@@ -54,12 +60,37 @@ def obtener_dato_de_prueba(pregunta):
     datos = enviar_peticion(url, body)
     return extraer_texto(datos)
 
-# Bloque de pruebas
 
+#Bloque de pregunta 
 try:
-        pregunta = "En 20 palabras, ¿Cual es el animal mas grande del mundo?"
-        resultado = obtener_dato_de_prueba(pregunta)
-        print("Respuesta de la IA:")
-        print(resultado)
+    pregunta = "En 20 palabras, ¿Cual es el animal mas grande del mundo?"
+    
+    # Ejecucion de flujo para obtener datos
+    url, body = armar_peticion(pregunta)
+    datos_respuesta = enviar_peticion(url, body)
+    
+    # Extraer datos con función
+    resultado = extraer_texto(datos_respuesta)
+    print("Respuesta de la IA:")
+    print(resultado)
+    
+    print("\n--- MÉTRICAS DE USO Y COSTO ---")
+    # Precios de referencia por modelo
+    PRECIO_ENTRADA = 0.00000030
+    PRECIO_SALIDA = 0.00000250 
+    
+    # 3. Calculo el costo con función calcular_costo
+    uso = datos_respuesta["usageMetadata"]
+    tokens_in = uso["promptTokenCount"]
+    tokens_out = uso["candidatesTokenCount"]
+    tokens_total = uso["totalTokenCount"]
+    
+    costo_total = calcular_costo(datos_respuesta, PRECIO_ENTRADA, PRECIO_SALIDA)
+    
+    print(f"Tokens de entrada: {tokens_in}")
+    print(f"Tokens de salida: {tokens_out}")
+    print(f"Total de tokens: {tokens_total}")
+    print(f"Costo estimado: ${costo_total:.6f}")
+
 except (ValueError, RuntimeError) as error:
-        print("No se pudo completar la operación:", error)
+    print("No se pudo completar la operación:", error)
