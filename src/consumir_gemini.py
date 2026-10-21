@@ -1,6 +1,7 @@
 import os
 import requests
 from dotenv import load_dotenv
+import time
   
 load_dotenv()
 
@@ -12,10 +13,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def calcular_costo(datos, precio_entrada, precio_salida):
-	uso = datos["usageMetadata"]
-	tokens_entrada = uso["promptTokenCount"]
-	tokens_salida = uso["candidatesTokenCount"]
-	return (tokens_entrada * precio_entrada) + (tokens_salida * precio_salida)
+    """Extrae la metadata, calcula el costo y retorna todas las métricas juntas."""
+    uso = datos["usageMetadata"]
+    tokens_entrada = uso["promptTokenCount"]
+    tokens_salida = uso["candidatesTokenCount"]
+    tokens_total = uso["totalTokenCount"]
+    
+    costo = (tokens_entrada * precio_entrada) + (tokens_salida * precio_salida)
+    
+    
+    return costo, tokens_entrada, tokens_salida, tokens_total
 
 def armar_peticion(pregunta):
     #Valida entrada, construye la URL y el body de la petición.
@@ -32,7 +39,9 @@ def armar_peticion(pregunta):
     return url, body
 
 def enviar_peticion(url, body):
+
     #Envía la petición y maneja errores de red o de formato JSON.
+    
     try:
         respuesta = requests.post(url, json=body)
     except requests.exceptions.ConnectionError:
@@ -49,48 +58,44 @@ def enviar_peticion(url, body):
 
 def extraer_texto(datos):
     #Extrae el texto generado de la estructura JSON de la respuesta
+    print("\n--- MÉTRICAS DE USO Y COSTO ---")
+    print(f" Tokens de entrada:" ,datos["usageMetadata"]["promptTokenCount"])
+    print(f" Tokens de salida:" ,datos["usageMetadata"]["candidatesTokenCount"])
+    print(f" Tokens totales usados:" ,datos["usageMetadata"]["totalTokenCount"])
     try:
+        
         return datos["candidates"][0]["content"]["parts"][0]["text"]
     except (KeyError, IndexError):
         raise RuntimeError("La respuesta no trae el texto generado en el lugar esperado.")
 
+#bloque de pruebas
 def obtener_dato_de_prueba(pregunta):
     #Función principal que coordina el flujo completo del módulo.
-    url, body = armar_peticion(pregunta)
-    datos = enviar_peticion(url, body)
-    return extraer_texto(datos)
+    try:
+        url, body = armar_peticion(pregunta)
+        datos = enviar_peticion(url, body)
+        costo = calcular_costo(datos,0.00000030,0.00000250)
+        print("Respuesta de la IA:")
+        print(f"Costo estimado: ${costo}")
+        return extraer_texto(datos)
+    except (ValueError, RuntimeError) as error:
+            print("No se pudo completar la operación:", error)
 
+def test_latencia (i) :
+        latencias = []
+        for i in range(4):
+            url, body = armar_peticion("C ")
+            inicio = time.perf_counter()
+            respuesta_json = enviar_peticion(url, body)
+            fin = time.perf_counter()
+            latencias.append(fin - inicio)
+            print(f"Intento {i + 1}: {latencias[-1]:.2f} segundos")
+        latencia_promedio = sum(latencias) / len(latencias)
+        print(f"Latencia promedio: {latencia_promedio:.2f} segundos")
+            
+ 
 
-#Bloque de pregunta 
-try:
-    pregunta = "En 20 palabras, ¿Cual es el animal mas grande del mundo?"
+if __name__ == "__main__":#
+    print(obtener_dato_de_prueba("¿cuanto es 2 + 2? dame solo el numero"))
+    test_latencia(10)
     
-    # Ejecucion de flujo para obtener datos
-    url, body = armar_peticion(pregunta)
-    datos_respuesta = enviar_peticion(url, body)
-    
-    # Extraer datos con función
-    resultado = extraer_texto(datos_respuesta)
-    print("Respuesta de la IA:")
-    print(resultado)
-    
-    print("\n--- MÉTRICAS DE USO Y COSTO ---")
-    # Precios de referencia por modelo
-    PRECIO_ENTRADA = 0.00000030
-    PRECIO_SALIDA = 0.00000250 
-    
-    # 3. Calculo el costo con función calcular_costo
-    uso = datos_respuesta["usageMetadata"]
-    tokens_in = uso["promptTokenCount"]
-    tokens_out = uso["candidatesTokenCount"]
-    tokens_total = uso["totalTokenCount"]
-    
-    costo_total = calcular_costo(datos_respuesta, PRECIO_ENTRADA, PRECIO_SALIDA)
-    
-    print(f"Tokens de entrada: {tokens_in}")
-    print(f"Tokens de salida: {tokens_out}")
-    print(f"Total de tokens: {tokens_total}")
-    print(f"Costo estimado: ${costo_total:.6f}")
-
-except (ValueError, RuntimeError) as error:
-    print("No se pudo completar la operación:", error)
