@@ -26,7 +26,7 @@ def armar_peticion(pregunta, system_instruction, response_schema=None):
     if not system_instruction or not system_instruction.strip():
         raise ValueError("El prompt de sistema no puede estar vacío.")
     
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("API_KEY")
     if not api_key:
         raise RuntimeError("No se encontró la API key en las variables de entorno.")
         
