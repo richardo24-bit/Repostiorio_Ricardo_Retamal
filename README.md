@@ -9,6 +9,8 @@ Abre tu terminal en la carpeta raíz del proyecto (asegúrate de no estar ubicad
 ***Crea el entorno virtual dentro de la carpeta del proyecto ejecutando el siguiente comando:***
 
 python -m venv venv
+o
+python3 -m venv venv
 
 
 ***Activa el entorno virtual (recuerda hacer esto cada vez que abras una nueva terminal antes de instalar dependencias o ejecutar scripts):***
@@ -61,7 +63,11 @@ Tu archivo de ejecución principal importa la función coordinadora obtener_dato
  *3* En la Terminal Ejecutar:
     python src/main.py
 
-## Estructura de carpetas
+
+
+
+
+git## Estructura de carpetas
 
 - `src/` : todo el código fuente del proyecto va aquí.
 - `docs/` : documentación técnica del proyecto (diagramas, decisiones de arquitectura, notas).
@@ -81,17 +87,23 @@ Causa: Terminal abierta fuera de la raíz del proyecto o antes de configurar la 
 
 Solución: Posicionarse en la carpeta raíz y utilizar python -m pip install -r requirements.txt.
 
+
+
 Incidencia 2: Error pip : El término 'pip' no se reconoce como nombre de un cmdlet.
 
 Causa: Restricciones del sistema o PowerShell sin el ejecutable global directo.
 
 Solución: Invocación robusta mediante el módulo de Python (python -m pip).
 
+
+
 Incidencia 3: Error por ubicación de archivos de código (consumir_gemini.py no se encontraba).
 
 Causa: Los archivos de lógica están alojados dentro de la subcarpeta src/.
 
 Solución: Ejecución apuntando a la ruta relativa correcta desde la raíz (python src/consumir_gemini.py).
+
+
 
 Incidencia 4: Error de API Key no válida o no encontrada al correr las pruebas.
 
@@ -100,5 +112,7 @@ Causa A: Uso de una variable distinta (GEMINI_API_KEY vs API_KEY).
 Causa B: Modificación del archivo .env en Visual Studio Code sin guardar los cambios (Ctrl + S).
 
 Solución: Estandarizar la variable a API_KEY según el código y asegurar el guardado físico del archivo .env antes de correr el script.
+
+
 
 Resultado final: El proyecto corre de forma fluida, validando credenciales, cargando variables locales y procesando consultas e instrucciones personalizadas sin intervención manual adicional.
