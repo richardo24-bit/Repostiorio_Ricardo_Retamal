@@ -15,7 +15,7 @@ python -m venv venv
 
 En Windows (CMD / PowerShell):
 
-venv\Scripts\activate
+venv\Scripts\activate   
 
 
 En macOS / Linux:
@@ -25,18 +25,20 @@ source venv/bin/activate
 
 ***Instala las dependencias usando el archivo de requerimientos:***
 
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 
 
 ***Configura el archivo de credenciales (.env):**
 
-El repositorio incluye una plantilla de ejemplo llamada .env.example.
+El repositorio incluye una plantilla llamada .env.example.
 
-Crea una copia de este archivo en la misma carpeta raíz y nómbralo .env (este archivo se mantiene de forma local y está protegido en el .gitignore para no subir tus credenciales).
+Crea una copia de este archivo en la raíz del proyecto y nómbralo exactamente .env (este archivo se mantiene de forma local y está protegido en .gitignore).
 
-Abre el archivo .env y configura tu llave personal utilizando exactamente la variable que busca el código (API_KEY):
+Abre el archivo .env en tu editor, escribe tu clave real bajo la variable configurada en el proyecto (API_KEY):
 
+Fragmento de código
 API_KEY=tu_clave_api_real_aqui
+⚠️ Importante (VS Code): Asegúrate de guardar los cambios en el archivo .env presionando Ctrl + S (o Cmd + S en Mac). Si el archivo queda sin guardar, el programa no leerá la clave actualizada y arrojará un error de credenciales no válidas.
 
 
 
@@ -48,13 +50,16 @@ API_KEY=tu_clave_api_real_aqui
 
 Si ejecutas directamente el módulo principal, este validará la consistencia del banco de prompts definido y creará/actualizará automáticamente el archivo registro_resultados.json:
 
-python consumir_gemini.py
+python src/consumir_gemini.py
 
 
-2. Realizar consultas personalizadas desde main.py
+2. Realizar consultas personalizadas desde archivo main.py
 
 Tu archivo de ejecución principal importa la función coordinadora obtener_dato_de_prueba para enviar preguntas e instrucciones de sistema personalizadas
-
+ *1* Modificar Instruccion de sistema a la deseada
+ *2* Modificar pregunta_usuario para obtener respuesta deseada.
+ *3* En la Terminal Ejecutar:
+    python src/main.py
 
 ## Estructura de carpetas
 
@@ -67,20 +72,33 @@ Tu archivo de ejecución principal importa la función coordinadora obtener_dato
 - `.gitignore` : le dice a Git qué archivos y carpetas ignorar (entre ellos, tu entorno virtual y tu archivo `.env`).
 
 
-Registro del ensayo de instalación limpia
+📝 Registro del Ensayo de Instalación Limpia e Incidencias
+Fecha: 2026-10-22 (Entre las 20:30 y 23:30 hrs)
 
-Fecha: 2026-10-22 (20:30 - 21:27 hrs)
+Incidencia 1: Error No such file or directory: requirements.txt al intentar instalar dependencias.
 
-Encontrado:
+Causa: Terminal abierta fuera de la raíz del proyecto o antes de configurar la estructura.
 
-Error No such file or directory: 'requirements.txt' al intentar instalar dependencias debido a que el entorno virtual se había creado fuera de la carpeta raíz del proyecto.
+Solución: Posicionarse en la carpeta raíz y utilizar python -m pip install -r requirements.txt.
 
-Error No se encontró la API key en las variables de entorno porque el archivo .env utilizaba la clave API_KEY= mientras que el entorno requería concordancia exacta con la lectura de credenciales.
+Incidencia 2: Error pip : El término 'pip' no se reconoce como nombre de un cmdlet.
 
-Corregido:
+Causa: Restricciones del sistema o PowerShell sin el ejecutable global directo.
 
-Se recreó el entorno virtual venv estrictamente dentro de la carpeta raíz del repositorio para alinear la ruta de ejecución con el archivo requirements.txt.
+Solución: Invocación robusta mediante el módulo de Python (python -m pip).
 
-Se unificó la nomenclatura en el archivo .env utilizando API_KEY= para asegurar la lectura correcta mediante os.getenv().
+Incidencia 3: Error por ubicación de archivos de código (consumir_gemini.py no se encontraba).
 
-Resultado tras la corrección: El proyecto realiza la instalación limpia de dependencias y ejecuta el script main.py sin errores ni intervención manual adicional
+Causa: Los archivos de lógica están alojados dentro de la subcarpeta src/.
+
+Solución: Ejecución apuntando a la ruta relativa correcta desde la raíz (python src/consumir_gemini.py).
+
+Incidencia 4: Error de API Key no válida o no encontrada al correr las pruebas.
+
+Causa A: Uso de una variable distinta (GEMINI_API_KEY vs API_KEY).
+
+Causa B: Modificación del archivo .env en Visual Studio Code sin guardar los cambios (Ctrl + S).
+
+Solución: Estandarizar la variable a API_KEY según el código y asegurar el guardado físico del archivo .env antes de correr el script.
+
+Resultado final: El proyecto corre de forma fluida, validando credenciales, cargando variables locales y procesando consultas e instrucciones personalizadas sin intervención manual adicional.
