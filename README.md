@@ -25,9 +25,17 @@ Este proyecto implementa un cliente y módulo en Python para interactuar de form
      ```
 
 4. **Instala las dependencias** usando el archivo de requerimientos:
+  
+    Windows
    ```bash
    python -m pip install -r requirements.txt
    ```
+    LINUX/MAC
+
+    ```bash
+   ./venv//bin/python -m pip install -r requirements.txt
+   ```
+   
 
 5. **Configura el archivo de credenciales (`.env`):**
    * El repositorio incluye una plantilla llamada `.env.example`.
