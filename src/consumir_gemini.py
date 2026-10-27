@@ -9,7 +9,7 @@ import time
 load_dotenv()
 
 def calcular_costo(datos, precio_entrada, precio_salida):
-    #Extrae la metadata, calcula el costo y retorna todas las métricas juntas.#
+    # Extrae la metadata, calcula el costo y retorna todas las métricas juntas.
     uso = datos["usageMetadata"]
     tokens_entrada = uso["promptTokenCount"]
     tokens_salida = uso["candidatesTokenCount"]
@@ -19,7 +19,7 @@ def calcular_costo(datos, precio_entrada, precio_salida):
     return costo, tokens_entrada, tokens_salida, tokens_total
 
 def armar_peticion(pregunta, system_instruction, response_schema=None):
-    #Valida entrada y sistema, construye la URL, el body y el esquema opcional JSON.#
+    # Valida entrada y sistema, construye la URL, el body y el esquema opcional JSON.
     if not pregunta or not pregunta.strip():
         raise ValueError("La pregunta no puede estar vacía.")
     
@@ -51,11 +51,18 @@ def armar_peticion(pregunta, system_instruction, response_schema=None):
     return url, body
 
 def enviar_peticion(url, body):
-    #Envía la petición y maneja errores de red o de formato JSON.#
+    # Envía la petición y maneja errores de red o de formato JSON.
     try:
-        respuesta = requests.post(url, json=body)
-    except requests.exceptions.ConnectionError:
-        raise RuntimeError("No se pudo conectar con el servicio. Intenta de nuevo en unos segundos.")
+        respuesta = requests.post(url, json=body, timeout=10)
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+        # Se corrigió añadiendo la 'f' para que interpole la variable {e} correctamente
+        raise TimeoutError(f"No se pudo conectar o tiempo de espera agotado: {e}")
+
+    if respuesta.status_code in (401, 403):
+        raise ValueError("Credencial inválida o sin permiso. Revisa tu API_KEY.")
+    
+    if respuesta.status_code == 429 or respuesta.status_code >= 500:
+        raise TimeoutError("El proveedor no pudo procesar la petición. Hay que esperar y reintentar.")
     
     if respuesta.status_code != 200:
         raise RuntimeError(f"El servicio respondió con un error (Código {respuesta.status_code}): {respuesta.text}")
@@ -65,8 +72,19 @@ def enviar_peticion(url, body):
     except requests.exceptions.JSONDecodeError:
         raise RuntimeError("La respuesta del servicio no llegó en el formato esperado.")
 
+def con_reintento(funcion, intentos=3, espera_segundos=2):
+    """Función genérica para reintentar operaciones que fallen por TimeoutError (límites o red)."""
+    for intento in range(1, intentos + 1):
+        try:
+            return funcion()
+        except TimeoutError as error:
+            if intento == intentos:
+                raise RuntimeError(f"El servicio no respondió tras varios intentos. Último error: {error}")
+            print(f"  [Reintento] Intento {intento} de {intentos} falló. Esperando {espera_segundos}s...")
+            time.sleep(espera_segundos)
+
 def extraer_texto(datos):
-    #Extrae el texto generado de la estructura JSON de la respuesta.#
+    # Extrae el texto generado de la estructura JSON de la respuesta.
     print("\n--- MÉTRICAS DE USO Y COSTO ---")
     print(" Tokens de entrada:", datos["usageMetadata"]["promptTokenCount"])
     print(" Tokens de salida:", datos["usageMetadata"]["candidatesTokenCount"])
@@ -77,7 +95,7 @@ def extraer_texto(datos):
         raise RuntimeError("La respuesta no trae el texto generado en el lugar esperado.")
 
 def parsear_respuesta_json(texto):
-    #Limpia markdown, decodifica el JSON y retorna el diccionario de Python.#
+    # Limpia markdown, decodifica el JSON y retorna el diccionario de Python.
     texto_limpio = texto.strip()
     texto_limpio = re.sub(r"^```(?:json)?\s*", "", texto_limpio)
     texto_limpio = re.sub(r"\s*```$", "", texto_limpio)
@@ -147,23 +165,26 @@ BANCO_DE_PROMPTS = [
 ]
 
 def probar_consistencia_banco():
-    #Ejecuta el banco de prompts múltiples veces y genera el registro de resultados.#
+    # Ejecuta el banco de prompts múltiples veces y genera el registro de resultados.
     registro = {}
     print("--- INICIANDO PRUEBAS DE CONSISTENCIA DEL BANCO DE PROMPTS ---\n")
     
     for prompt in BANCO_DE_PROMPTS:
         exitos = 0
-        intentos = 3
+        intentos_banco = 3
         print(f"Probando prompt: '{prompt['nombre']}'")
         
-        for intento in range(intentos):
+        for intento in range(intentos_banco):
             try:
                 url, body = armar_peticion(
                     prompt["ejemplo_usuario"],
                     prompt["system_instruction"],
                     prompt.get("response_schema"),
                 )
-                respuesta = enviar_peticion(url, body)
+                
+                # Envolvemos el envío en la función de reintento para aguantar caídas y límites 429
+                respuesta = con_reintento(lambda: enviar_peticion(url, body))
+                
                 texto = extraer_texto(respuesta)
                 datos = parsear_respuesta_json(texto)
                 
@@ -171,13 +192,15 @@ def probar_consistencia_banco():
                     exitos += 1
                 else:
                     print(f"  Intento {intento + 1} falló: Faltan claves esperadas en la estructura.")
-            except (ValueError, RuntimeError) as error:
+            
+            # Se incluye TimeoutError para capturar correctamente las excepciones de reintento agotado o red
+            except (ValueError, RuntimeError, TimeoutError) as error:
                 print(f"  Intento {intento + 1} falló: {error}")
             
             time.sleep(2)
             
-        print(f"-> Resultado para '{prompt['nombre']}': {exitos}/{intentos} respuestas válidas\n")
-        registro[prompt["nombre"]] = {"exitos": exitos, "intentos": intentos}
+        print(f"-> Resultado para '{prompt['nombre']}': {exitos}/{intentos_banco} respuestas válidas\n")
+        registro[prompt["nombre"]] = {"exitos": exitos, "intentos": intentos_banco}
 
     with open("prompts/registro_resultados.json", "w", encoding="utf-8") as archivo:
         json.dump(registro, archivo, indent=2, ensure_ascii=False)
@@ -185,10 +208,12 @@ def probar_consistencia_banco():
     print("¡Pruebas finalizadas! Registro guardado en 'registro_resultados.json'.")
 
 def obtener_dato_de_prueba(pregunta, system_instruction, response_schema=None):
-    #Función principal que coordina el flujo completo del módulo.#
+    # Función principal que coordina el flujo completo del módulo.
     try:
         url, body = armar_peticion(pregunta, system_instruction, response_schema)
-        datos = enviar_peticion(url, body)
+        
+        # Integrando reintento automático
+        datos = con_reintento(lambda: enviar_peticion(url, body))
         
         costo, tokens_in, tokens_out, tokens_tot = calcular_costo(datos, 0.00000030, 0.00000250)
         
@@ -200,18 +225,18 @@ def obtener_dato_de_prueba(pregunta, system_instruction, response_schema=None):
         else:
             return texto_generado
             
-    except (ValueError, RuntimeError) as error:
+    except (ValueError, RuntimeError, TimeoutError) as error:
         print("No se pudo completar la operación:", error)
         return None
 
 def test_latencia(pregunta, system_instruction, ciclos=4):
-    #Realiza pruebas de rendimiento midiendo la latencia.#
+    # Realiza pruebas de rendimiento midiendo la latencia.
     latencias = []
     try:
         url, body = armar_peticion(pregunta, system_instruction)
         for i in range(ciclos):
             inicio = time.perf_counter()
-            _ = enviar_peticion(url, body)
+            _ = con_reintento(lambda: enviar_peticion(url, body))
             fin = time.perf_counter()
             latencia_intento = fin - inicio
             latencias.append(latencia_intento)
@@ -219,7 +244,7 @@ def test_latencia(pregunta, system_instruction, ciclos=4):
             
         latencia_promedio = sum(latencias) / len(latencias)
         print(f"Latencia promedio: {latencia_promedio:.2f} segundos")
-    except (ValueError, RuntimeError) as error:
+    except (ValueError, RuntimeError, TimeoutError) as error:
         print("Error en el test de latencia:", error)
 
 if __name__ == "__main__":
