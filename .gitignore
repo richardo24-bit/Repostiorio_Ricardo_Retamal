@@ -6,6 +6,9 @@ env/
 # Variables de entorno (secretos, nunca se sube)
 .env
 
+# Base de datos vectorial persistente (Chroma)
+vectorstore/
+
 # Cachés y compilados de Python
 __pycache__/
 *.py[cod]
