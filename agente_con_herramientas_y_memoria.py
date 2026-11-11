@@ -19,77 +19,107 @@ load_dotenv()
 modelo = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite")
 
 
-# --- Bloque 1: Herramienta personalizada con Pydantic (args_schema) ---
-class ArgumentosConsultaSiniestro(BaseModel):
-    numero_siniestro: str = Field(
-        description="Número de identificación del siniestro, por ejemplo 'SIN88888'."
+# --- Bloque 1: Herramientas con Pydantic (args_schema) adaptadas al nuevo dominio ---
+
+class ArgumentosPasosSiniestro(BaseModel):
+    etapa_actual: str = Field(
+        description="La etapa o momento actual del siniestro, por ejemplo 'denuncio', 'liquidación' o 'reparación'."
     )
-    incluir_bitacora: bool = Field(
-        default=False,
-        description="Si es True, incluye el detalle técnico y la bitácora completa de los analistas de taller."
+    incluir_plazos: bool = Field(
+        default=True,
+        description="Si es True, incluye los plazos estimados de cada paso."
     )
 
 
-TALLERES_DB = {
-    "SIN88888": {
-        "actual": "El vehículo se encuentra en fase de pintura y pulido final. Estimado de entrega: 3 días hábiles.",
-        "bitacora": [
-            "ingreso al taller y desarme pericial",
-            "aprobación de repuestos por liquidación",
-            "reparación de latonería y aplicación de fondo",
-        ],
-    },
-    "SIN11111": {
-        "actual": "El auto está ingresado en bancada para reparación estructural de chasis.",
-        "bitacora": [
-            "ingreso a banco de estiraje",
-            "medición láser de geometría",
-        ],
-    },
-}
+class ArgumentosDocumentacion(BaseModel):
+    tipo_siniestro: str = Field(
+        description="Tipo de siniestro o reclamo, por ejemplo 'choque', 'robo' o 'daño parcial'."
+    )
 
 
 @tool(
-    "consultar_estado_reparacion_con_bitacora",
-    args_schema=ArgumentosConsultaSiniestro
+    "consultar_pasos_a_seguir",
+    args_schema=ArgumentosPasosSiniestro
 )
-def consultar_estado_reparacion_detallado(
-    numero_siniestro: str,
-    incluir_bitacora: bool = False
-) -> str:
-    """Consulta el estado actual de la reparación de un vehículo en el taller, 
-    con la opción de incluir su bitácora técnica completa."""
+def consultar_pasos_a_seguir(etapa_actual: str, incluir_plazos: bool = True) -> str:
+    """Explica de forma clara y secuencial los pasos a seguir por el asegurado 
+    según la etapa en la que seencuentre su siniestro."""
     
-    siniestro = TALLERES_DB.get(numero_siniestro.strip().upper())
-    if siniestro is None:
-        return f"No se encontró ningún registro de taller para el siniestro {numero_siniestro}."
+    etapa = etapa_actual.strip().lower()
     
-    if not incluir_bitacora:
-        return siniestro["actual"]
-    
-    bitacora_texto = ", ".join(siniestro["bitacora"])
-    return f"{siniestro['actual']} (Bitácora técnica: {bitacora_texto})"
+    if "denuncio" in etapa:
+        pasos = (
+            "1. Presentar la constancia o denuncia policial (si aplica).\n"
+            "2. Ingresar el formulario de denuncio de siniestro.\n"
+            "3. Esperar la asignación del liquidador o número de expediente."
+        )
+        plazos = "\nPlazo sugerido para denuncio: dentro de las primeras 48 a 72 horas hábiles." if incluir_plazos else ""
+        return f"Pasos para la etapa de denuncio:\n{pasos}{plazos}"
+        
+    elif "liquidación" in etapa or "peritaje" in etapa:
+        pasos = (
+            "1. Ingresar el vehículo al taller asignado para la tasación.\n"
+            "2. Esperar la emisión del presupuesto de daños.\n"
+            "3. Revisión y validación de cobertura y deducibles por el liquidador."
+        )
+        plazos = "\nPlazo estimado: 3 a 5 días hábiles." if incluir_plazos else ""
+        return f"Pasos para la etapa de liquidación:\n{pasos}{plazos}"
+        
+    else:
+        return (
+            "Pasos generales del proceso:\n"
+            "1. Denuncio del siniestro.\n"
+            "2. Evaluación y peritaje en taller.\n"
+            "3. Aprobación y ejecución de la reparación o indemnización."
+        )
 
 
-@tool
-def calcular_presupuesto_adicional(horas_mano_obra: float, costo_repuestos: float) -> str:
-    """Calcula el presupuesto total estimado sumando las horas de mano de obra 
-    (valorizadas a $35,000 la hora) y el costo neto de los repuestos mecánicos."""
-    total = (horas_mano_obra * 35000) + costo_repuestos
-    return f"El presupuesto adicional calculado es de ${total:,.2f}."
+@tool(
+    "consultar_documentacion_aprobacion",
+    args_schema=ArgumentosDocumentacion
+)
+def consultar_documentacion_aprobacion(tipo_siniestro: str) -> str:
+    """Indica la documentación legal y técnica obligatoria que el asegurado 
+    debe presentar o subir al sistema para lograr la aprobación de su siniestro."""
+    
+    tipo = tipo_siniestro.strip().lower()
+    
+    if "choque" in tipo or "colisión" in tipo or "daño" in tipo:
+        return (
+            "Documentación necesaria para aprobación de daños materiales:\n"
+            "- Licencia de conducir vigente del conductor al momento del hecho.\n"
+            "- Padrón o certificado de inscripción del vehículo.\n"
+            "- Relato de los hechos firmado por el asegurado.\n"
+            "- Fotografías nítidas de los daños y de la patente."
+        )
+    elif "robo" in tipo:
+        return (
+            "Documentación necesaria para siniestros de robo:\n"
+            "- Copia original de la constancia o denuncia ante Carabineros/Policía.\n"
+            "- Padrón del vehículo y certificado de multas no pagadas.\n"
+            "- Entrega de todas las llaves originales del vehículo."
+        )
+    else:
+        return (
+            "Documentación estándar solicitada:\n"
+            "- Cédula de identidad del asegurado.\n"
+            "- Licencia de conducir (si conducía al momento).\n"
+            "- Formulario de reclamación de siniestro completado y firmado."
+        )
 
 
 # --- Bloque 2: Ensamblaje del agente y ejecutor ---
 herramientas = [
-    consultar_estado_reparacion_detallado,
-    calcular_presupuesto_adicional,
+    consultar_pasos_a_seguir,
+    consultar_documentacion_aprobacion,
 ]
 
 prompt_agente = ChatPromptTemplate.from_messages([
     (
         "system",
-        "Eres un asistente operativo experto en coordinación de talleres y siniestros automotrices. "
-        "Ayuda a los asegurados utilizando las herramientas disponibles estrictamente cuando las necesites.",
+        "Eres un asistente operativo experto en orientación al cliente y gestión de siniestros. "
+        "Ayuda a los asegurados guiándoles sobre los pasos a seguir, la documentación de aprobación, "
+        "o atendiendo de forma empática sus consultas y quejas operativas utilizando estrictamente las herramientas cuando se requiera.",
     ),
     MessagesPlaceholder("chat_history"),
     ("human", "{entrada}"),
@@ -107,57 +137,34 @@ ejecutor_agente = AgentExecutor(
 
 
 if __name__ == "__main__":
-    # Historial de conversación explícito en memoria
     chat_history = []
 
-    print("--- TURNO 1: Consulta inicial con bitácora ---")
-    entrada_1 = "¿Cuál es el estado de reparación del siniestro SIN88888, incluyendo su bitácora técnica?"
-    
+    print("--- TURNO 1: Consulta sobre pasos a seguir ---")
+    entrada_1 = "¿Cuáles son los pasos a seguir justo después de realizar el denuncio de mi choque?"
     res_1 = ejecutor_agente.invoke({
         "entrada": entrada_1,
         "chat_history": chat_history
     })
-    
     print("Respuesta 1:", res_1["output"])
-
-    # Actualizamos el historial de forma limpia con los objetos estándar de LangChain
+    
     chat_history.append(HumanMessage(content=entrada_1))
     chat_history.append(AIMessage(content=res_1["output"]))
 
-    print("\n--- TURNO 2: Pregunta contextual usando la memoria ---")
-    entrada_2 = "¿Ya fue entregado ese mismo vehículo?"
-    
+    print("\n--- TURNO 2: Consulta sobre documentación contextual con memoria ---")
+    entrada_2 = "¿Qué documentos exactos necesito presentar para que me aprueben este caso?"
     res_2 = ejecutor_agente.invoke({
         "entrada": entrada_2,
         "chat_history": chat_history
     })
-    
     print("Respuesta 2:", res_2["output"])
 
+    chat_history.append(HumanMessage(content=entrada_2))
+    chat_history.append(AIMessage(content=res_2["output"]))
 
-
-
-    """
-=============================================================================
-REGISTRO DE APRENDIZAJE Y NOTA TÉCNICA (A CONSIDERAR A FUTURO):
-=============================================================================
-- Error anterior: 
-  'ValueError: Message dict must contain 'role' and 'content' keys' 
-  generado al utilizar 'RunnableWithMessageHistory' combinado con 'langchain-google-genai'.
-
-- Causa raíz:
-  Las versiones actuales de los adaptadores de Gemini inyectan metadatos internos 
-  complejos en los mensajes de respuesta (campos adicionales como 'extras', 'index', etc.). 
-  Al delegar la memoria en el manejador automático predeterminado, dichos metadatos 
-  se serializan incorrectamente. En el siguiente turno, al intentar reinyectar el historial, 
-  el formateador de mensajes de LangChain falla porque espera diccionarios limpios 
-  con claves estrictas de 'role' y 'content'.
-
-- Solución aplicada:
-  Se eliminó la dependencia de 'RunnableWithMessageHistory' y se optó por un manejo 
-  explícito del historial mediante una lista nativa (`chat_history = []`). 
-  Se anexan manualmente objetos de clase estándar de LangChain (`HumanMessage` y `AIMessage`) 
-  después de cada invocación, garantizando una compatibilidad total, control transparente 
-  y evitando la corrupción de metadatos de Gemini en conversaciones multiturno.
-=============================================================================
-"""
+    print("\n--- TURNO 3: Atención de queja o consulta operativa ---")
+    entrada_3 = "Me parece inaceptable que los plazos de peritaje estén demorando tanto tiempo, ¿pueden hacer algo?"
+    res_3 = ejecutor_agente.invoke({
+        "entrada": entrada_3,
+        "chat_history": chat_history
+    })
+    print("Respuesta 3:", res_3["output"])
