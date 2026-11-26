@@ -1,0 +1,15 @@
+Fecha: 2026-11-26
+Configuracion: k=3, chunk_size=200, chunk_overlap=30
+
+0.33  1.00  ¿Cuánto plazo tengo para denunciar un siniestro?
+0.33  1.00  ¿Por qué medio se ingresa el denuncio de un choque?
+0.33  1.00  ¿Qué papeles piden si choqué el auto?
+0.33  1.00  ¿Es necesario llevar el padrón y la licencia al día para aprobar daños?
+0.33  1.00  ¿Quién revisa el auto para calcular cuánto cuesta arreglarlo?
+0.33  1.00  ¿Dónde se hace la evaluación técnica de piezas y reparación?
+0.33  1.00  ¿Con quién reclamo si el peritaje se está demorando mucho?
+0.33  1.00  ¿A quién se escalan las quejas operativas en atención de siniestros?
+0.33  1.00  ¿Qué es lo que tengo que pagar de mi bolsillo al usar el seguro?
+0.00  n/a  ¿El seguro cubre robo de accesorios dentro del estacionamiento?
+
+promedio -> precision: 0.300  recall: 1.000
